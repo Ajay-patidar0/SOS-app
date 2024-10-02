@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -72,8 +73,18 @@ class MainActivity : AppCompatActivity() {
 
     // Retrieve contacts from your contact list (this is a placeholder)
         val contacts = listOf("1234567890")  // Add logic to retrieve actual contacts
+        TODO()
 
+    }
 
+    private fun makeCall(phonenumber: String){
+        val callIntent =Intent(Intent.ACTION_CALL)
+        callIntent.data= Uri.parse("tel:$phonenumber")
+        if(ContextCompat.checkSelfPermission(this,android.Manifest.permission.CALL_PHONE)==PackageManager.PERMISSION_GRANTED){
+            startActivity(callIntent)
+        }else{
+            Toast.makeText(this, "Call permission is not granterd", Toast.LENGTH_SHORT).show( )
+        }
     }
 
     private fun checkPermissions(): Boolean {
@@ -97,4 +108,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     }
+
+    // Handle the result of permission requests
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 101) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                fetchLocationandSendSOS()
+            } else {
+                Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
 }

@@ -9,4 +9,8 @@
     <color name="white">#FFFFFFFF</color>
     <color name="hintcolor">#bfbfbf</color>
     <color name="btncolor">#F9A826</color>
+    <color name="gray">#808080</color>
+    <color name="darker_gray">#A9A9A9</color>
+    <color name="emergency_red">#D32F2F</color>
+    <color name="emergency_blue">#1976D2</color>
 </resources>
