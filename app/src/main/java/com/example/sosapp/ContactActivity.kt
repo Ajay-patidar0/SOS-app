@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.sosapp.databinding.ActivityContactBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
 
 class ContactActivity : AppCompatActivity() {
     private val contactList = ArrayList<Contact>()
@@ -25,8 +26,11 @@ class ContactActivity : AppCompatActivity() {
         binding = ActivityContactBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Initialize Firestore
+        // Initialize Firestore with offline persistence
         firestore = FirebaseFirestore.getInstance()
+        firestore.firestoreSettings = FirebaseFirestoreSettings.Builder()
+            .setPersistenceEnabled(true)
+            .build()
 
         // Set up RecyclerView
         binding.recyclerViewContacts.layoutManager = LinearLayoutManager(this)
@@ -44,6 +48,18 @@ class ContactActivity : AppCompatActivity() {
         binding.homebtn.setOnClickListener {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Ensure the user is authenticated before loading contacts
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            loadContacts() // Load contacts if user is authenticated
+        } else {
+            Log.w("ContactActivity", "User not authenticated.")
+            // Optionally, redirect to a login activity
         }
     }
 
@@ -66,13 +82,18 @@ class ContactActivity : AppCompatActivity() {
                     if (phone.length == 10 && phone.all { it.isDigit() }) {
                         if (isPriority) {
                             // Remove priority from all other contacts
-                            contactList.forEach { it.isPriority = false }
+                            contactList.forEach { contact ->
+                                if (contact.isPriority) {
+                                    contact.isPriority = false
+                                    updateContactInFirestore(contact) // Update Firestore record
+                                }
+                            }
                         }
                         val newContact = Contact(name, phone, isPriority)
                         contactList.add(newContact)
                         contactAdapter.notifyDataSetChanged()
 
-                        // Save to Firestore
+                        // Save new contact to Firestore
                         saveContactToFirestore(newContact)
                     } else {
                         Toast.makeText(this, "Phone number must be 10 digits.", Toast.LENGTH_SHORT).show()
@@ -108,6 +129,26 @@ class ContactActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateContactInFirestore(contact: Contact) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            firestore.collection("contacts").document(userId)
+                .collection("user_contacts")
+                .whereEqualTo("phone", contact.phone) // Assuming phone number is unique
+                .get()
+                .addOnSuccessListener { documents ->
+                    for (document in documents) {
+                        firestore.collection("contacts").document(userId)
+                            .collection("user_contacts")
+                            .document(document.id)
+                            .update("isPriority", contact.isPriority)
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.w("ContactActivity", "Error updating contact", e)
+                }
+        }
+    }
 
     private fun loadContacts() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
@@ -131,5 +172,4 @@ class ContactActivity : AppCompatActivity() {
             Log.w("ContactActivity", "User not authenticated.")
         }
     }
-
 }

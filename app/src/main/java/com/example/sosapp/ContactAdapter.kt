@@ -6,29 +6,39 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class ContactAdapter(private val contacts: List<Contact>) : RecyclerView.Adapter<ContactAdapter.ContactViewHolder>() {
+class ContactAdapter(private val contactList: List<Contact>) : RecyclerView.Adapter<ContactAdapter.ContactViewHolder>() {
 
-    // ViewHolder to hold views for each contact item
+    // ViewHolder to bind the layout views
     class ContactViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val nameTextView: TextView = itemView.findViewById(R.id.contactName)
-        val phoneTextView: TextView = itemView.findViewById(R.id.contactPhone)
+        val contactName: TextView = itemView.findViewById(R.id.contactName)
+        val contactPhone: TextView = itemView.findViewById(R.id.contactPhone)
+        val priorityIndicator: TextView = itemView.findViewById(R.id.priorityIndicator)
     }
 
-    // Inflate the contact item layout
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ContactViewHolder {
+        // Inflate the contact item layout
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_contact, parent, false)
         return ContactViewHolder(view)
     }
 
-    // Bind the data to the ViewHolder
     override fun onBindViewHolder(holder: ContactViewHolder, position: Int) {
-        val contact = contacts[position]
-        holder.nameTextView.text = contact.name
-        holder.phoneTextView.text = contact.phone
+        val contact = contactList[position]
+
+        // Bind the data to the TextViews
+        holder.contactName.text = contact.name
+        holder.contactPhone.text = contact.phone
+
+        // Set the priority indicator visibility based on priority status
+        if (contact.isPriority) {
+            holder.priorityIndicator.text = "Priority Contact" // You can change the text or style
+            holder.priorityIndicator.visibility = View.VISIBLE
+        } else {
+            holder.priorityIndicator.visibility = View.GONE
+        }
     }
 
-    // Return the total number of contacts
+
     override fun getItemCount(): Int {
-        return contacts.size
+        return contactList.size
     }
 }
