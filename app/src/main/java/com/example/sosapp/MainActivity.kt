@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.net.Uri
 import android.os.Bundle
+import android.telephony.SmsManager
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -21,6 +22,10 @@ import com.google.android.gms.tasks.OnSuccessListener
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    companion object {
+        private const val SMS_PERMISSION_REQUEST_CODE = 101
+        private const val CALL_PERMISSION_REQUEST_CODE = 102
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,12 +49,12 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        binding.home.setOnClickListener {
+     /*    binding.home.setOnClickListener {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
-        }
+        } */
 
-        binding.contacts.setOnClickListener {
+        binding.mycircle.setOnClickListener {
             startActivity(Intent(this, ContactActivity::class.java))
             finish()
         }
@@ -69,12 +74,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendSOSMessage(latitude: Double, longitude: Double) {
-                val message="Emergency! Help needed at: https://www.google.com/maps/search/?api=1&query=$latitude,$longitude"
+        // Step 1: Create the emergency message with location
+        val message = "Emergency! Help needed at: https://www.google.com/maps/search/?api=1&query=$latitude,$longitude"
+        val contactList: MutableList<Contact> = mutableListOf()
+        // Step 2: Retrieve contacts from your contact list (Replace with your actual contact list)
+        // Example contact list. You'll have to implement your own logic to retrieve actual contacts.
+        val contacts = contactList.map { it.phone }
 
-    // Retrieve contacts from your contact list (this is a placeholder)
-        val contacts = listOf("1234567890")  // Add logic to retrieve actual contacts
-        TODO()
+        // Step 3: Send SMS to all contacts
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.SEND_SMS), SMS_PERMISSION_REQUEST_CODE)
+            return
+        }
 
+        // Step 4: Use SmsManager to send the message to each contact
+        val smsManager = SmsManager.getDefault()
+        for (contact in contacts) {
+            smsManager.sendTextMessage(contact, null, message, null, null)
+        }
+
+        Toast.makeText(this, "SOS Message sent to all contacts!", Toast.LENGTH_SHORT).show()
+
+        // Step 5: Call the priority contact if available
+        val priorityContact = contactList.find { it.isPriority }
+        if (priorityContact != null) {
+            makeCall(priorityContact.phone)
+        } else {
+            Toast.makeText(this, "No priority contact set.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun makeCall(phonenumber: String){
@@ -113,7 +140,7 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
-        grantResults: IntArray
+        grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 101) {

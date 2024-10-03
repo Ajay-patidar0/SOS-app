@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.play.services.location)
     implementation(libs.androidx.recyclerview)
     implementation(libs.firebase.inappmessaging)
+    implementation(libs.firebase.firestore)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -59,4 +60,6 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.0.0")
     implementation("com.google.firebase:firebase-analytics")
     implementation ("com.google.android.gms:play-services-location:21.3.0")
+    implementation ("com.google.firebase:firebase-firestore-ktx:24.6.0")
+
 }
