@@ -21,9 +21,4 @@
         android:maxLength="10"
         android:minHeight="48dp" />
 
-    <CheckBox
-        android:id="@+id/checkBoxPriority"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Set as priority contact" />
 </LinearLayout>

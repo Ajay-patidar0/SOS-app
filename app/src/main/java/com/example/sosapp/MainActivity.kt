@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
-import android.net.Uri
 import android.os.Bundle
 import android.telephony.SmsManager
 import android.util.Log
@@ -22,6 +21,13 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.tasks.OnSuccessListener
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.GET
+import retrofit2.http.Query
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -30,8 +36,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val SMS_PERMISSION_REQUEST_CODE = 101
-        private const val CALL_PERMISSION_REQUEST_CODE = 102
-        private const val LOCATION_PERMISSION_REQUEST_CODE = 103
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 102
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,8 +47,8 @@ class MainActivity : AppCompatActivity() {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         setContentView(binding.root)
 
-        // Set window insets
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+        // Set window insets for UI
+        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
@@ -53,48 +58,121 @@ class MainActivity : AppCompatActivity() {
         firestore = FirebaseFirestore.getInstance()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
-        // SOS button click
+        // SOS button click listener
         binding.sosbtn.setOnClickListener {
             if (checkPermissions()) {
-                fetchLocationAndSendSOS()
+                fetchLocationAndSendSOS("Emergency! Help needed!") // General SOS message
             }
         }
 
-        // My Circle button click (Navigate to contacts)
+        // My Circle button click listener (Navigate to contacts)
         binding.mycircle.setOnClickListener {
             startActivity(Intent(this, ContactActivity::class.java))
-            finish()
+        }
+
+        // Medical button click listener
+        binding.medical.setOnClickListener {
+            if (checkPermissions()) {
+                fetchLocationAndSendSOS("Medical emergency! Immediate assistance needed!", true)
+            }
+        }
+
+        // Accident button click listener
+        binding.accident.setOnClickListener {
+            if (checkPermissions()) {
+                fetchLocationAndSendSOS("Accident! Need help urgently!", true)
+            }
+        }
+
+        // Violence button click listener
+        binding.violence.setOnClickListener {
+            if (checkPermissions()) {
+                fetchLocationAndSendSOS("Violence incident! Please send help!")
+            }
+        }
+
+        // Fire button click listener
+        binding.fire.setOnClickListener {
+            if (checkPermissions()) {
+                fetchLocationAndSendSOS("Fire emergency! Immediate assistance required!")
+            }
         }
     }
 
     @SuppressLint("MissingPermission")
-    private fun fetchLocationAndSendSOS() {
+    private fun fetchLocationAndSendSOS(customMessage: String, includeHospitals: Boolean = false) {
         fusedLocationClient.lastLocation.addOnSuccessListener(this, OnSuccessListener<Location> { location ->
             if (location != null) {
                 val latitude = location.latitude
                 val longitude = location.longitude
-                // Fetch contacts and then send the SOS message
-                fetchContactsAndSendSOS(latitude, longitude)
+
+                Log.d("Location Fetch", "Latitude: $latitude, Longitude: $longitude")
+
+                if (includeHospitals) {
+                    fetchNearbyHospitals(latitude, longitude, customMessage)
+                } else {
+                    val messageWithLocation = "$customMessage Help needed at: https://www.google.com/maps/search/?api=1&query=$latitude,$longitude"
+                    fetchContactsAndSendSOS(latitude, longitude, messageWithLocation)
+                }
             } else {
                 Toast.makeText(this, "Unable to fetch location", Toast.LENGTH_SHORT).show()
+            }
+        }).addOnFailureListener { e ->
+            Toast.makeText(this, "Location fetch error: ${e.message}", Toast.LENGTH_SHORT).show()
+            Log.e("Location Error", "Error fetching location", e)
+        }
+    }
+
+    private fun fetchNearbyHospitals(latitude: Double, longitude: Double, customMessage: String) {
+        val overpassService = Retrofit.Builder()
+            .baseUrl("https://overpass-api.de/api/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(OverpassService::class.java)
+
+        val query = "[out:json];node[amenity=hospital](around:2000,$latitude,$longitude);out;"
+        overpassService.getNearbyHospitals(query).enqueue(object : Callback<HospitalResponse> {
+            override fun onResponse(call: Call<HospitalResponse>, response: Response<HospitalResponse>) {
+                if (response.isSuccessful) {
+                    val hospitals = response.body()?.elements ?: emptyList()
+
+                    // Get the top 5 nearest hospitals
+                    val nearestHospitals = hospitals
+                        .sortedBy { hospital ->
+                            val hospitalLatitude = hospital.lat
+                            val hospitalLongitude = hospital.lon
+                            calculateDistance(latitude, longitude, hospitalLatitude, hospitalLongitude)
+                        }
+                        .take(5) // Take only the top 5 nearest hospitals
+
+                    sendSOSMessageWithHospitals(latitude, longitude, nearestHospitals, customMessage)
+                } else {
+                    Log.e("Overpass API", "Error: ${response.errorBody()?.string()}")
+                    fetchContactsAndSendSOS(latitude, longitude, customMessage) // Send without hospital info
+                }
+            }
+
+            override fun onFailure(call: Call<HospitalResponse>, t: Throwable) {
+                Log.e("Overpass API", "Failure: ${t.message}")
+                fetchContactsAndSendSOS(latitude, longitude, customMessage) // Send without hospital info
             }
         })
     }
 
-    private fun fetchContactsAndSendSOS(latitude: Double, longitude: Double) {
+    private fun fetchContactsAndSendSOS(latitude: Double, longitude: Double, customMessage: String) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
         if (userId != null) {
             firestore.collection("contacts").document(userId).collection("user_contacts")
                 .get()
                 .addOnSuccessListener { result ->
-                    val contactList = mutableListOf<Contact>()
-                    for (document in result) {
-                        val contact = document.toObject(Contact::class.java)
-                        contactList.add(contact)
-                        // Log the contact details for debugging
-                        Log.d("Contact", "Fetched contact: $contact")
+                    val contactList = result.toObjects(Contact::class.java)
+                    Log.d("Contacts", "Fetched contacts: $contactList")
+
+                    if (contactList.isNotEmpty()) {
+                        sendCustomSOSMessage(latitude, longitude, contactList, customMessage)
+                    } else {
+                        Toast.makeText(this, "No contacts found!", Toast.LENGTH_SHORT).show()
                     }
-                    sendSOSMessage(latitude, longitude, contactList)
                 }
                 .addOnFailureListener { exception ->
                     Toast.makeText(this, "Error fetching contacts: ${exception.message}", Toast.LENGTH_SHORT).show()
@@ -104,20 +182,44 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendSOSMessage(latitude: Double, longitude: Double, contactList: List<Contact>) {
-        // Create the emergency message with the user's location
-        val message = "Emergency! Help needed at: https://www.google.com/maps/search/?api=1&query=$latitude,$longitude"
+    private fun sendSOSMessageWithHospitals(latitude: Double, longitude: Double, hospitals: List<Hospital>, smsMessage: String) {
+        // Create the emergency message with the user's location and nearby hospitals
+        val hospitalLocations = hospitals.joinToString("\n") {
+            "Hospital: ${it.tags.name ?: "Unknown"} - Location: https://www.google.com/maps/search/?api=1&query=${it.lat},${it.lon}"
+        }
 
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+        // Log the hospital details for debugging
+        Log.d("Hospital Locations", "Nearby Hospitals:\n$hospitalLocations")
+
+        // Construct the complete message
+        val message = "$smsMessage Help needed at: https://www.google.com/maps/search/?api=1&query=$latitude,$longitude\nNearby Hospitals:\n$hospitalLocations"
+
+        // Log the final message before sending
+        Log.d("SOS Message", "Final SOS Message: $message")
+
+        // Fetch contacts to send the message
+        fetchContactsAndSendSOS(latitude, longitude, message)
+    }
+
+    private fun sendCustomSOSMessage(latitude: Double, longitude: Double, contactList: List<Contact>, smsMessage: String) {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.SEND_SMS), SMS_PERMISSION_REQUEST_CODE)
             return
         }
 
-        // Use SmsManager to send the message to each contact
         val smsManager = SmsManager.getDefault()
-        for (contact in contactList) {
+
+        // Split message if it exceeds the limit
+        val messageParts = smsManager.divideMessage(smsMessage)
+
+        contactList.forEach { contact ->
             try {
-                smsManager.sendTextMessage(contact.phone, null, message, null, null)
+                // Log the message being sent
+                Log.d("SMS", "Sending message to: ${contact.phone} - Message: $smsMessage")
+
+                // Send each part of the message
+                smsManager.sendMultipartTextMessage(contact.phone, null, messageParts, null, null)
+
                 Log.d("SMS", "Sent message to: ${contact.phone}")
             } catch (e: Exception) {
                 Log.e("SMS Error", "Failed to send message to: ${contact.phone}, Error: ${e.message}")
@@ -125,26 +227,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         Toast.makeText(this, "SOS Message sent to all contacts!", Toast.LENGTH_SHORT).show()
-
-        // Call the priority contact if available
-        val priorityContact = contactList.find { it.isPriority }
-        if (priorityContact != null) {
-            makeCall(priorityContact.phone)
-        } else {
-            Toast.makeText(this, "No priority contact set.", Toast.LENGTH_SHORT).show()
-        }
     }
 
-    private fun makeCall(phoneNumber: String) {
-        val callIntent = Intent(Intent.ACTION_CALL)
-        callIntent.data = Uri.parse("tel:$phoneNumber")
 
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
-            startActivity(callIntent)
-        } else {
-            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.CALL_PHONE), CALL_PERMISSION_REQUEST_CODE)
-        }
-    }
 
     private fun checkPermissions(): Boolean {
         val smsPermission = ContextCompat.checkSelfPermission(this, android.Manifest.permission.SEND_SMS)
@@ -153,11 +238,9 @@ class MainActivity : AppCompatActivity() {
         return if (smsPermission == PackageManager.PERMISSION_GRANTED && locationPermission == PackageManager.PERMISSION_GRANTED) {
             true
         } else {
-            ActivityCompat.requestPermissions(
-                this,
+            ActivityCompat.requestPermissions(this,
                 arrayOf(android.Manifest.permission.SEND_SMS, android.Manifest.permission.ACCESS_FINE_LOCATION),
-                SMS_PERMISSION_REQUEST_CODE
-            )
+                SMS_PERMISSION_REQUEST_CODE)
             false
         }
     }
@@ -168,18 +251,29 @@ class MainActivity : AppCompatActivity() {
         when (requestCode) {
             SMS_PERMISSION_REQUEST_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    fetchLocationAndSendSOS()
+                    // Permission granted, can send SMS
                 } else {
                     Toast.makeText(this, "SMS permission denied", Toast.LENGTH_SHORT).show()
                 }
             }
-            CALL_PERMISSION_REQUEST_CODE -> {
+            LOCATION_PERMISSION_REQUEST_CODE -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // Permission granted, you may call the priority contact here if needed
+                    // Permission granted, can access location
                 } else {
-                    Toast.makeText(this, "Call permission denied", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show()
                 }
             }
         }
+    }
+
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
+        val results = FloatArray(1)
+        Location.distanceBetween(lat1, lon1, lat2, lon2, results)
+        return results[0]
+    }
+
+    interface OverpassService {
+        @GET("interpreter")
+        fun getNearbyHospitals(@Query("data") query: String): Call<HospitalResponse>
     }
 }

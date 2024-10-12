@@ -67,7 +67,6 @@ class ContactActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_contact, null)
         val nameEditText = dialogView.findViewById<EditText>(R.id.editTextName)
         val phoneEditText = dialogView.findViewById<EditText>(R.id.editTextPhone)
-        val priorityCheckBox = dialogView.findViewById<CheckBox>(R.id.checkBoxPriority)
 
         AlertDialog.Builder(this)
             .setTitle("Add Contact")
@@ -75,23 +74,16 @@ class ContactActivity : AppCompatActivity() {
             .setPositiveButton("Add") { _, _ ->
                 val name = nameEditText.text.toString().trim()
                 val phone = phoneEditText.text.toString().trim()
-                val isPriority = priorityCheckBox.isChecked
+
 
                 // Validation for phone number
                 if (name.isNotEmpty() && phone.isNotEmpty()) {
                     if (phone.length == 10 && phone.all { it.isDigit() }) {
-                        if (isPriority) {
-                            // Remove priority from all other contacts
-                            contactList.forEach { contact ->
-                                if (contact.isPriority) {
-                                    contact.isPriority = false
-                                    updateContactInFirestore(contact) // Update Firestore record
-                                }
-                            }
-                        }
-                        val newContact = Contact(name, phone, isPriority)
+                        // If a contact is marked as a priority, remove priority from existing contacts
+
+                        val newContact = Contact(name, phone)
                         contactList.add(newContact)
-                        contactAdapter.notifyDataSetChanged()
+                        contactAdapter.notifyDataSetChanged() // Notify adapter about new contact
 
                         // Save new contact to Firestore
                         saveContactToFirestore(newContact)
@@ -107,13 +99,13 @@ class ContactActivity : AppCompatActivity() {
             .show()
     }
 
+
     private fun saveContactToFirestore(contact: Contact) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
         if (userId != null) {
             val contactData = hashMapOf(
                 "name" to contact.name,
                 "phone" to contact.phone,
-                "isPriority" to contact.isPriority
             )
 
             firestore.collection("contacts").document(userId).collection("user_contacts")
@@ -129,26 +121,7 @@ class ContactActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateContactInFirestore(contact: Contact) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid
-        if (userId != null) {
-            firestore.collection("contacts").document(userId)
-                .collection("user_contacts")
-                .whereEqualTo("phone", contact.phone) // Assuming phone number is unique
-                .get()
-                .addOnSuccessListener { documents ->
-                    for (document in documents) {
-                        firestore.collection("contacts").document(userId)
-                            .collection("user_contacts")
-                            .document(document.id)
-                            .update("isPriority", contact.isPriority)
-                    }
-                }
-                .addOnFailureListener { e ->
-                    Log.w("ContactActivity", "Error updating contact", e)
-                }
-        }
-    }
+
 
     private fun loadContacts() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
@@ -159,17 +132,31 @@ class ContactActivity : AppCompatActivity() {
                 .get()
                 .addOnSuccessListener { result ->
                     contactList.clear() // Clear existing contacts
+                    var hasPriorityContact = false // Track if there is a priority contact
+
+                    // Iterate through the retrieved documents
                     for (document in result) {
                         val contact = document.toObject(Contact::class.java)
                         contactList.add(contact)
+
+
                     }
-                    contactAdapter.notifyDataSetChanged() // Notify adapter about data changes
+
+                    // Notify adapter about data changes
+                    contactAdapter.notifyDataSetChanged()
+
+
+
                 }
                 .addOnFailureListener { exception ->
-                    Log.w("ContactActivity", "Error getting contacts: ", exception)
+                    // Handle errors while fetching data
+                    Log.e("LoadContacts", "Error getting contacts: ", exception)
+                    Toast.makeText(this, "Failed to load contacts.", Toast.LENGTH_SHORT).show()
                 }
         } else {
-            Log.w("ContactActivity", "User not authenticated.")
+            Toast.makeText(this, "User not authenticated.", Toast.LENGTH_SHORT).show()
         }
     }
+
+
 }
