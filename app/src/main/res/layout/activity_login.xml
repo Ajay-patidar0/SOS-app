@@ -82,19 +82,6 @@
       app:layout_constraintTop_toBottomOf="@+id/textView4"
       app:layout_constraintVertical_bias="0.086" />
 
-  <TextView
-      android:id="@+id/forgotpass"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="Forgot Password?"
-      android:textColor="#000000"
-      app:layout_constraintBottom_toBottomOf="parent"
-      app:layout_constraintEnd_toEndOf="parent"
-      app:layout_constraintHorizontal_bias="0.852"
-      app:layout_constraintStart_toStartOf="parent"
-      app:layout_constraintTop_toBottomOf="@+id/password"
-      app:layout_constraintVertical_bias="0.204" />
-
   <Button
       android:id="@+id/signupbtn"
       android:layout_width="140dp"

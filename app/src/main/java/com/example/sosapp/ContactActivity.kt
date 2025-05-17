@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -15,34 +14,33 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 
-class ContactActivity : AppCompatActivity() {
+class ContactActivity : AppCompatActivity(), ContactAdapter.OnContactClickListener {
     private val contactList = ArrayList<Contact>()
     private lateinit var contactAdapter: ContactAdapter
     private lateinit var binding: ActivityContactBinding
     private lateinit var firestore: FirebaseFirestore
+    private lateinit var userId: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityContactBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Initialize Firestore with offline persistence
         firestore = FirebaseFirestore.getInstance()
         firestore.firestoreSettings = FirebaseFirestoreSettings.Builder()
             .setPersistenceEnabled(true)
             .build()
 
-        // Set up RecyclerView
+        userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
         binding.recyclerViewContacts.layoutManager = LinearLayoutManager(this)
-        contactAdapter = ContactAdapter(contactList)
+        contactAdapter = ContactAdapter(contactList, this)
         binding.recyclerViewContacts.adapter = contactAdapter
 
-        // Load contacts from Firestore
         loadContacts()
 
-        // Set onClick listeners
         binding.addcontact.setOnClickListener {
-            showAddContactDialog()
+            showAddOrEditDialog(null, null)
         }
 
         binding.homebtn.setOnClickListener {
@@ -51,112 +49,104 @@ class ContactActivity : AppCompatActivity() {
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        // Ensure the user is authenticated before loading contacts
-        val userId = FirebaseAuth.getInstance().currentUser?.uid
-        if (userId != null) {
-            loadContacts() // Load contacts if user is authenticated
-        } else {
-            Log.w("ContactActivity", "User not authenticated.")
-            // Optionally, redirect to a login activity
-        }
-    }
-
-    private fun showAddContactDialog() {
+    private fun showAddOrEditDialog(contact: Contact?, docId: String?) {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_contact, null)
         val nameEditText = dialogView.findViewById<EditText>(R.id.editTextName)
         val phoneEditText = dialogView.findViewById<EditText>(R.id.editTextPhone)
 
+        if (contact != null) {
+            nameEditText.setText(contact.name)
+            phoneEditText.setText(contact.phone)
+        }
+
         AlertDialog.Builder(this)
-            .setTitle("Add Contact")
+            .setTitle(if (contact == null) "Add Contact" else "Edit Contact")
             .setView(dialogView)
-            .setPositiveButton("Add") { _, _ ->
+            .setPositiveButton(if (contact == null) "Add" else "Update") { _, _ ->
                 val name = nameEditText.text.toString().trim()
                 val phone = phoneEditText.text.toString().trim()
 
+                if (name.isNotEmpty() && phone.length == 10 && phone.all { it.isDigit() }) {
+                    val newContact = Contact(name, phone)
 
-                // Validation for phone number
-                if (name.isNotEmpty() && phone.isNotEmpty()) {
-                    if (phone.length == 10 && phone.all { it.isDigit() }) {
-                        // If a contact is marked as a priority, remove priority from existing contacts
-
-                        val newContact = Contact(name, phone)
-                        contactList.add(newContact)
-                        contactAdapter.notifyDataSetChanged() // Notify adapter about new contact
-
-                        // Save new contact to Firestore
-                        saveContactToFirestore(newContact)
+                    if (docId == null) {
+                        addContact(newContact)
                     } else {
-                        Toast.makeText(this, "Phone number must be 10 digits.", Toast.LENGTH_SHORT).show()
+                        updateContact(newContact, docId)
                     }
                 } else {
-                    Toast.makeText(this, "Please fill in all fields.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Enter valid name and 10-digit phone number", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancel", null)
-            .create()
             .show()
     }
 
-
-    private fun saveContactToFirestore(contact: Contact) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid
-        if (userId != null) {
-            val contactData = hashMapOf(
-                "name" to contact.name,
-                "phone" to contact.phone,
-            )
-
-            firestore.collection("contacts").document(userId).collection("user_contacts")
-                .add(contactData)
-                .addOnSuccessListener { documentReference ->
-                    Log.d("ContactActivity", "Contact added with ID: ${documentReference.id}")
-                }
-                .addOnFailureListener { e ->
-                    Log.w("ContactActivity", "Error adding contact", e)
-                }
-        } else {
-            Log.w("ContactActivity", "User not authenticated.")
-        }
+    private fun addContact(contact: Contact) {
+        firestore.collection("contacts").document(userId).collection("user_contacts")
+            .add(contact)
+            .addOnSuccessListener {
+                loadContacts()
+                Toast.makeText(this, "Contact added", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to add contact", Toast.LENGTH_SHORT).show()
+            }
     }
 
+    private fun updateContact(contact: Contact, docId: String) {
+        firestore.collection("contacts").document(userId)
+            .collection("user_contacts").document(docId)
+            .set(contact)
+            .addOnSuccessListener {
+                loadContacts()
+                Toast.makeText(this, "Contact updated", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to update contact", Toast.LENGTH_SHORT).show()
+            }
+    }
 
+    private fun deleteContact(docId: String) {
+        firestore.collection("contacts").document(userId)
+            .collection("user_contacts").document(docId)
+            .delete()
+            .addOnSuccessListener {
+                loadContacts()
+                Toast.makeText(this, "Contact deleted", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to delete contact", Toast.LENGTH_SHORT).show()
+            }
+    }
 
     private fun loadContacts() {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid
-        if (userId != null) {
-            firestore.collection("contacts")
-                .document(userId) // Access the document for the current user
-                .collection("user_contacts") // Access the user's contacts sub-collection
-                .get()
-                .addOnSuccessListener { result ->
-                    contactList.clear() // Clear existing contacts
-                    var hasPriorityContact = false // Track if there is a priority contact
-
-                    // Iterate through the retrieved documents
-                    for (document in result) {
-                        val contact = document.toObject(Contact::class.java)
-                        contactList.add(contact)
-
-
-                    }
-
-                    // Notify adapter about data changes
-                    contactAdapter.notifyDataSetChanged()
-
-
-
+        firestore.collection("contacts").document(userId).collection("user_contacts")
+            .get()
+            .addOnSuccessListener { result ->
+                contactList.clear()
+                for (doc in result) {
+                    val contact = doc.toObject(Contact::class.java)
+                    contact.docId = doc.id
+                    contactList.add(contact)
                 }
-                .addOnFailureListener { exception ->
-                    // Handle errors while fetching data
-                    Log.e("LoadContacts", "Error getting contacts: ", exception)
-                    Toast.makeText(this, "Failed to load contacts.", Toast.LENGTH_SHORT).show()
-                }
-        } else {
-            Toast.makeText(this, "User not authenticated.", Toast.LENGTH_SHORT).show()
-        }
+                contactAdapter.notifyDataSetChanged()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to load contacts", Toast.LENGTH_SHORT).show()
+            }
     }
 
+    override fun onEditClicked(contact: Contact) {
+        showAddOrEditDialog(contact, contact.docId)
+    }
 
+    override fun onDeleteClicked(contact: Contact) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete Contact")
+            .setMessage("Are you sure you want to delete this contact?")
+            .setPositiveButton("Delete") { _, _ -> deleteContact(contact.docId ?: "") }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 }

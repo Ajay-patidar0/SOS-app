@@ -1,6 +1,7 @@
 package com.example.sosapp
 
 data class Contact(
-    val name: String = "",
-    val phone: String= ""
+    var name: String = "",
+    var phone: String = "",
+    var docId: String? = null
 )
