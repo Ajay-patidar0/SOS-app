@@ -126,7 +126,7 @@
         android:id="@+id/home"
         android:layout_width="70dp"
         android:layout_height="80dp"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="10dp"
         app:layout_constraintEnd_toEndOf="@+id/violence"
         app:layout_constraintHorizontal_bias="0.387"
         app:layout_constraintStart_toStartOf="@+id/violence"
@@ -137,11 +137,11 @@
         android:id="@+id/mycircle"
         android:layout_width="70dp"
         android:layout_height="80dp"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="10dp"
         app:layout_constraintEnd_toEndOf="@+id/fire"
         app:layout_constraintHorizontal_bias="0.754"
         app:layout_constraintStart_toEndOf="@+id/home"
         app:layout_constraintTop_toBottomOf="@+id/violence"
-        app:srcCompat="@drawable/contacts" />
+        app:srcCompat="@drawable/contacts_o" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,45 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:card_view="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="12dp">
+    android:layout_margin="10dp"
+    card_view:cardCornerRadius="12dp"
+    card_view:cardElevation="6dp"
+    card_view:cardBackgroundColor="@android:color/white">
 
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_weight="1"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/contactName"
-            android:layout_width="wrap_content"
+        <!-- Contact Info -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="Name"
-            android:textStyle="bold"
-            android:textSize="20sp" />
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/contactPhone"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Phone"
-            android:textSize="16sp" />
+            <TextView
+                android:id="@+id/contactName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Name"
+                android:textSize="20sp"
+                android:textColor="@android:color/black"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/contactPhone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Phone"
+                android:textSize="16sp"
+                android:textColor="@android:color/darker_gray" />
+        </LinearLayout>
+
+        <!-- Action Buttons -->
+        <ImageButton
+            android:id="@+id/editButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:background="?android:selectableItemBackgroundBorderless"
+            android:contentDescription="Edit"
+            android:src="@android:drawable/ic_menu_edit"
+            card_view:tint="@color/darker_gray" />
+
+        <ImageButton
+            android:id="@+id/deleteButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?android:selectableItemBackgroundBorderless"
+            android:contentDescription="Delete"
+            android:src="@android:drawable/ic_menu_delete"
+            card_view:tint="@color/emergency_red" />
+
     </LinearLayout>
-
-    <ImageButton
-        android:id="@+id/editButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@android:drawable/ic_menu_edit"
-        android:contentDescription="Edit"
-        android:background="?android:selectableItemBackgroundBorderless" />
-
-    <ImageButton
-        android:id="@+id/deleteButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@android:drawable/ic_menu_delete"
-        android:contentDescription="Delete"
-        android:background="?android:selectableItemBackgroundBorderless" />
-</LinearLayout>
+</androidx.cardview.widget.CardView>
