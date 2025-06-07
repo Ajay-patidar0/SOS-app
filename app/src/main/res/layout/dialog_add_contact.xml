@@ -10,7 +10,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Enter Name"
-        android:minHeight="48dp" />
+        android:minHeight="48dp"
+        android:singleLine="true"
+        android:inputType="textPersonName"
+        android:imeOptions="actionNext" />
 
     <EditText
         android:id="@+id/editTextPhone"
@@ -19,6 +22,8 @@
         android:hint="Enter Phone Number"
         android:inputType="phone"
         android:maxLength="10"
-        android:minHeight="48dp" />
+        android:minHeight="48dp"
+        android:singleLine="true"
+        android:imeOptions="actionDone" />
 
 </LinearLayout>
