@@ -10,51 +10,64 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 
 class LoginActivity : AppCompatActivity() {
-    private val binding: ActivityLoginBinding by lazy{
+    private val binding: ActivityLoginBinding by lazy {
         ActivityLoginBinding.inflate(layoutInflater)
     }
-    lateinit var auth: FirebaseAuth
+
+    private lateinit var auth: FirebaseAuth
+
     override fun onStart() {
         super.onStart()
-        // Check if user already Logged in
-        val currentuser:FirebaseUser? = auth.currentUser
-        if(currentuser!=null){
-            startActivity(Intent(this,MainActivity::class.java))
+        val currentUser: FirebaseUser? = auth.currentUser
+        if (currentUser != null && currentUser.isEmailVerified) {
+            startActivity(Intent(this, MainActivity::class.java))
             finish()
-
         }
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
-        // Initialize Firebase Auth
-        auth= FirebaseAuth.getInstance()
 
+        auth = FirebaseAuth.getInstance()
 
         binding.loginbtn.setOnClickListener {
-            val email= binding.mail.text.toString()
-            val pass= binding.password.text.toString()
-            if(email.isEmpty()||pass.isEmpty()){
-                Toast.makeText(this, "Please Fill the details!", Toast.LENGTH_SHORT).show()
-            }
-            else{
-                auth.signInWithEmailAndPassword(email,pass)
-                    .addOnCompleteListener { task->
-                        if(task.isSuccessful){
-                            Toast.makeText(this, "Login Succesful✌️", Toast.LENGTH_SHORT).show()
-                            startActivity(Intent(this,MainActivity::class.java))
-                            finish()
-                        }
-                        else{
-                            Toast.makeText(this,"Login Failed ${task.exception?.message}", Toast.LENGTH_LONG).show()
+            val email = binding.mail.text.toString()
+            val pass = binding.password.text.toString()
+
+            if (email.isEmpty() || pass.isEmpty()) {
+                Toast.makeText(this, "Please fill the details!", Toast.LENGTH_SHORT).show()
+            } else {
+                auth.signInWithEmailAndPassword(email, pass)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            val user = auth.currentUser
+                            if (user != null && user.isEmailVerified) {
+                                Toast.makeText(this, "Login Successful ✌️", Toast.LENGTH_SHORT).show()
+                                startActivity(Intent(this, MainActivity::class.java))
+                                finish()
+                            } else {
+                                auth.signOut()
+                                Toast.makeText(
+                                    this,
+                                    "Please verify your email first!",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        } else {
+                            Toast.makeText(
+                                this,
+                                "Login Failed: ${task.exception?.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
             }
         }
 
         binding.signupbtn.setOnClickListener {
-            startActivity(Intent(this,SignupActivity::class.java))
+            startActivity(Intent(this, SignupActivity::class.java))
             finish()
         }
     }
